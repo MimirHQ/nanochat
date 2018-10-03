@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Chatbot</title>
+    <link rel="shortcut icon" href="https://class.mimir.io/favicon.ico?v=2.1">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.7.1/css/bulma.min.css">
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/1.3.6/socket.io.min.js"></script>
+	<script defer src="https://use.fontawesome.com/releases/v5.0.7/js/all.js"></script>
+	<style type="text/css">
+		
+		.message-container {
+			background: rgba(255, 255, 255, 0.65);
+			width: 75%;
+			color: black;
+			padding: 10px;
+			border-radius: 10px;
+			border: none;
+			margin: 10px 0;
+		}
+
+		.from-user {
+			background: rgba(255, 255, 255, 0.90);
+			margin-left: 25%;
+		}
+
+		.from-user .media .media-content {
+			text-align: right;
+		}
+
+		#user-input {
+			padding: 25px 15px;
+			margin: 10px 0;
+			border-radius: 10px;
+			box-shadow: 0 0 20px rgba(0, 0, 0, 0.25);
+		}
+
+		.message-container, #user-input {
+			line-height: 32px;
+		}
+
+		#conversation-over {
+			text-align: center;
+		}
+
+		.is-hidden {
+			display: none;
+		}
+
+	</style>
+</head>
+<body>
+	<section class="hero is-fullheight is-info is-bold">
+		<div class="hero-body">
+			<div class="container">
+				<div id="message-space">
+				</div>
+				<p id="conversation-over" class="is-hidden">Conversation ended.</p>
+				<input id="user-input" type="text" class="input is-info" disabled placeholder="Write your message here...">
+			</div>
+		</div>
+	</section>
+	<script type="text/javascript">
+
+		function addMessage(message, isUser, sessionid) {
+			const msgSpace = document.querySelector('#message-space');
+			const div = document.createElement('div');
+			div.classList.add('message-container');
+			if (isUser) {
+				div.classList.add('from-user')
+				div.innerHTML = `<div class="media">
+					<div class="media-content">
+						<div class="content"></div>
+					</div>
+					<figure class="media-right">
+						<p class="image is-32x32">
+							<img src="https://robohash.org/${sessionid}.png">
+						</p>
+					</figure>
+				</div>`;
+			} else {
+				div.innerHTML = `<div class="media">
+					<figure class="media-left">
+						<p class="image is-32x32">
+							<img src="https://robohash.org/chatbot10.png">
+						</p>
+					</figure>
+					<div class="media-content">
+						<div class="content"></div>
+					</div>
+				</div>`
+			}
+			div.querySelector('.content').innerText = message;
+			msgSpace.append(div);
+		}
+
+		function connect(callback) {
+			const ping = io.connect(`${document.location.origin}`);
+			ping.on('connect', function () {
+				ping.emit('get_namespace', {}, function (namespace) {
+					const socket = io.connect(`${document.location.origin}/${namespace}`);
+					socket.on('connect', function () {
+						callback(socket, namespace);
+					});
+				});
+			});
+		}
+
+		function main(socket, sessionid) {
+
+			const userInput = document.querySelector('#user-input');
+			const convOver = document.querySelector('#conversation-over');
+			userInput.removeAttribute('disabled');
+			userInput.addEventListener('keypress', function (e) {
+				if (e.keyCode === 13) {
+					msg = userInput.value;
+					addMessage(msg, true, sessionid);
+					userInput.value = ``;
+					userInput.setAttribute('disabled', true);
+					socket.emit('send_message', {data: {
+						message: msg
+					}}, function (status) {
+						if (status.alive) {
+							userInput.removeAttribute('disabled');
+							userInput.focus();
+						} else {
+							userInput.classList.add('is-hidden');
+							convOver.classList.remove('is-hidden');
+						}
+					});
+				}
+			});
+
+			socket.on('send_note', function (e) {
+				addMessage(e.note, false);
+			});
+
+		}
+
+		connect(main);
+
+	</script>
+</body>
+</html>
